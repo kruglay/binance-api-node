@@ -13,8 +13,8 @@ const defaultGetTime = () => Date.now()
 const makeQueryString = q =>
   q
     ? `?${Object.keys(q)
-        .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(q[k])}`)
-        .join('&')}`
+      .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(q[k])}`)
+      .join('&')}`
     : ''
 
 /**
@@ -31,7 +31,7 @@ const sendResult = call =>
     // For API errors the response will be valid JSON,but for proxy errors
     // it will be HTML
     return res.text().then(text => {
-      let error;
+      let error
       try {
         const json = JSON.parse(text)
         // The body was JSON parseable, assume it is an API response error
@@ -73,14 +73,24 @@ const checkParams = (name, payload, requires = []) => {
  * @param {object} headers
  * @returns {object} The api response
  */
-const publicCall = ({ base }) => (path, data, method = 'GET', headers = {}) =>
-  sendResult(
+const publicCall = ({ base }) => (path, data, method = 'GET', headers = {}, logToDb) => {
+  if (logToDb) {
+    logToDb.collection('requests').insertOne({
+      query: `${base}/api${path}${makeQueryString(data)}`,
+      method,
+      json: true,
+      headers,
+    })
+  }
+
+  return sendResult(
     fetch(`${base}/api${path}${makeQueryString(data)}`, {
       method,
       json: true,
       headers,
     }),
   )
+}
 
 /**
  * Factory method for partial private calls against the api
@@ -115,14 +125,15 @@ const privateCall = ({ apiKey, apiSecret, base, getTime = defaultGetTime, pubCal
   method = 'GET',
   noData,
   noExtra,
+  logToDb,
 ) => {
   if (!apiKey || !apiSecret) {
     throw new Error('You need to pass an API key and secret to make authenticated calls.')
   }
 
   return (data && data.useServerTime
-    ? pubCall('/v1/time').then(r => r.serverTime)
-    : Promise.resolve(getTime())
+      ? pubCall('/v1/time').then(r => r.serverTime)
+      : Promise.resolve(getTime())
   ).then(timestamp => {
     if (data) {
       delete data.useServerTime
@@ -134,6 +145,17 @@ const privateCall = ({ apiKey, apiSecret, base, getTime = defaultGetTime, pubCal
       .digest('hex')
 
     const newData = noExtra ? data : { ...data, timestamp, signature }
+
+    if (logToDb) {
+      logToDb.collection('requests').insertOne({
+        query: `${base}${path.includes('/wapi') ? '' : '/api'}${path}${noData
+          ? ''
+          : makeQueryString(newData)}`,
+        method,
+        headers: { 'X-MBX-APIKEY': apiKey },
+        json: true,
+      })
+    }
 
     return sendResult(
       fetch(
@@ -216,7 +238,7 @@ const aggTrades = (pubCall, payload) =>
   )
 
 export default opts => {
-  const base = opts && opts.httpBase || BASE;
+  const base = opts && opts.httpBase || BASE
   const pubCall = publicCall({ ...opts, base })
   const privCall = privateCall({ ...opts, base, pubCall })
   const kCall = keyCall({ ...opts, pubCall })
@@ -240,7 +262,7 @@ export default opts => {
       pubCall('/v1/ticker/allPrices').then(r =>
         r.reduce((out, cur) => ((out[cur.symbol] = cur.price), out), {}),
       ),
-    
+
     avgPrice: payload => pubCall('/v3/avgPrice', payload),
 
     allBookTickers: () =>
