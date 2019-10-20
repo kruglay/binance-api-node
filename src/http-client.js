@@ -73,7 +73,7 @@ const checkParams = (name, payload, requires = []) => {
  * @param {object} headers
  * @returns {object} The api response
  */
-const publicCall = ({ base }) => (path, data, method = 'GET', headers = {}, logToDb) => {
+const publicCall = ({ base, logToDb }) => (path, data, method = 'GET', headers = {}) => {
   if (logToDb) {
     logToDb.collection('requests').insertOne({
       query: `${base}/api${path}${makeQueryString(data)}`,
@@ -119,13 +119,13 @@ const keyCall = ({ apiKey, pubCall }) => (path, data, method = 'GET') => {
  * @param {object} headers
  * @returns {object} The api response
  */
-const privateCall = ({ apiKey, apiSecret, base, getTime = defaultGetTime, pubCall }) => (
+const privateCall = ({ apiKey, apiSecret, base, getTime = defaultGetTime, pubCall, logToDb }) => (
   path,
   data = {},
   method = 'GET',
   noData,
   noExtra,
-  logToDb,
+
 ) => {
   if (!apiKey || !apiSecret) {
     throw new Error('You need to pass an API key and secret to make authenticated calls.')
@@ -239,14 +239,19 @@ const aggTrades = (pubCall, payload) =>
 
 export default opts => {
   const base = opts && opts.httpBase || BASE
+
+  const pubCallLog = publicCall({ ...opts, base })
+  const privCallLog = privateCall({ ...opts, base, pubCall })
+
+  delete opts.logToDb
   const pubCall = publicCall({ ...opts, base })
-  const privCall = privateCall({ ...opts, base, pubCall })
+    const privCall = privateCall({ ...opts, base, pubCall })
   const kCall = keyCall({ ...opts, pubCall })
 
   return {
     ping: () => pubCall('/v1/ping').then(() => true),
     time: () => pubCall('/v1/time').then(r => r.serverTime),
-    exchangeInfo: () => pubCall('/v1/exchangeInfo'),
+    exchangeInfo: () => pubCallLog('/v1/exchangeInfo'),
 
     book: payload => book(pubCall, payload),
     aggTrades: payload => aggTrades(pubCall, payload),
@@ -270,26 +275,26 @@ export default opts => {
         r.reduce((out, cur) => ((out[cur.symbol] = cur), out), {}),
       ),
 
-    order: payload => order(privCall, payload, '/v3/order'),
-    orderTest: payload => order(privCall, payload, '/v3/order/test'),
-    getOrder: payload => privCall('/v3/order', payload),
-    cancelOrder: payload => privCall('/v3/order', payload, 'DELETE'),
+    order: payload => order(privCallLog, payload, '/v3/order'),
+    orderTest: payload => order(privCallLog, payload, '/v3/order/test'),
+    getOrder: payload => privCallLog('/v3/order', payload),
+    cancelOrder: payload => privCallLog('/v3/order', payload, 'DELETE'),
 
-    openOrders: payload => privCall('/v3/openOrders', payload),
-    allOrders: payload => privCall('/v3/allOrders', payload),
+    openOrders: payload => privCallLog('/v3/openOrders', payload),
+    allOrders: payload => privCallLog('/v3/allOrders', payload),
 
-    accountInfo: payload => privCall('/v3/account', payload),
-    myTrades: payload => privCall('/v3/myTrades', payload),
+    accountInfo: payload => privCallLog('/v3/account', payload),
+    myTrades: payload => privCallLog('/v3/myTrades', payload),
 
     withdraw: payload => privCall('/wapi/v3/withdraw.html', payload, 'POST'),
     withdrawHistory: payload => privCall('/wapi/v3/withdrawHistory.html', payload),
     depositHistory: payload => privCall('/wapi/v3/depositHistory.html', payload),
     depositAddress: payload => privCall('/wapi/v3/depositAddress.html', payload),
-    tradeFee: payload => privCall('/wapi/v3/tradeFee.html', payload).then(res => res.tradeFee),
-    assetDetail: payload => privCall('/wapi/v3/assetDetail.html', payload),
+    tradeFee: payload => privCallLog('/wapi/v3/tradeFee.html', payload).then(res => res.tradeFee),
+    assetDetail: payload => privCallLog('/wapi/v3/assetDetail.html', payload),
 
-    getDataStream: () => privCall('/v1/userDataStream', null, 'POST', true),
-    keepDataStream: payload => privCall('/v1/userDataStream', payload, 'PUT', false, true),
-    closeDataStream: payload => privCall('/v1/userDataStream', payload, 'DELETE', false, true),
+    getDataStream: () => privCallLog('/v1/userDataStream', null, 'POST', true),
+    keepDataStream: payload => privCallLog('/v1/userDataStream', payload, 'PUT', false, true),
+    closeDataStream: payload => privCallLog('/v1/userDataStream', payload, 'DELETE', false, true),
   }
 }
