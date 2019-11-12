@@ -133,7 +133,7 @@ const privateCall = ({ apiKey, apiSecret, base, getTime = defaultGetTime, pubCal
   }
 
   return (data && data.useServerTime
-      ? pubCall('/v1/time').then(r => r.serverTime)
+      ? pubCall('/v3/time').then(r => r.serverTime)
       : Promise.resolve(getTime())
   ).then(timestamp => {
     if (data) {
@@ -195,7 +195,7 @@ export const candleFields = [
  */
 const candles = (pubCall, payload) =>
   checkParams('candles', payload, ['symbol']) &&
-  pubCall('/v1/klines', { interval: '5m', ...payload }).then(candles =>
+  pubCall('/v3/klines', { interval: '5m', ...payload }).then(candles =>
     candles.map(candle => zip(candleFields, candle)),
   )
 
@@ -219,7 +219,7 @@ const order = (privCall, payload = {}, url) => {
  */
 const book = (pubCall, payload) =>
   checkParams('book', payload, ['symbol']) &&
-  pubCall('/v1/depth', payload).then(({ lastUpdateId, asks, bids }) => ({
+  pubCall('/v3/depth', payload).then(({ lastUpdateId, asks, bids }) => ({
     lastUpdateId,
     asks: asks.map(a => zip(['price', 'quantity'], a)),
     bids: bids.map(b => zip(['price', 'quantity'], b)),
@@ -227,7 +227,7 @@ const book = (pubCall, payload) =>
 
 const aggTrades = (pubCall, payload) =>
   checkParams('aggTrades', payload, ['symbol']) &&
-  pubCall('/v1/aggTrades', payload).then(trades =>
+  pubCall('/v3/aggTrades', payload).then(trades =>
     trades.map(trade => ({
       aggId: trade.a,
       price: trade.p,
@@ -252,29 +252,29 @@ export default opts => {
   const kCall = keyCall({ ...opts, pubCall })
 
   return {
-    ping: () => pubCall('/v1/ping').then(() => true),
-    time: () => pubCall('/v1/time').then(r => r.serverTime),
-    exchangeInfo: () => pubCallLog('/v1/exchangeInfo'),
+    ping: () => pubCall('/v3/ping').then(() => true),
+    time: () => pubCall('/v3/time').then(r => r.serverTime),
+    exchangeInfo: () => pubCallLog('/v3/exchangeInfo'),
 
     book: payload => book(pubCall, payload),
     aggTrades: payload => aggTrades(pubCall, payload),
     candles: payload => candles(pubCall, payload),
 
     trades: payload =>
-      checkParams('trades', payload, ['symbol']) && pubCall('/v1/trades', payload),
+      checkParams('trades', payload, ['symbol']) && pubCall('/v3/trades', payload),
     tradesHistory: payload =>
-      checkParams('tradesHitory', payload, ['symbol']) && kCall('/v1/historicalTrades', payload),
+      checkParams('tradesHitory', payload, ['symbol']) && kCall('/v3/historicalTrades', payload),
 
-    dailyStats: payload => pubCall('/v1/ticker/24hr', payload),
+    dailyStats: payload => pubCall('/v3/ticker/24hr', payload),
     prices: () =>
-      pubCall('/v1/ticker/allPrices').then(r =>
+      pubCall('/v3/ticker/allPrices').then(r =>
         r.reduce((out, cur) => ((out[cur.symbol] = cur.price), out), {}),
       ),
 
     avgPrice: payload => pubCall('/v3/avgPrice', payload),
 
     allBookTickers: () =>
-      pubCall('/v1/ticker/allBookTickers').then(r =>
+      pubCall('/v3/ticker/allBookTickers').then(r =>
         r.reduce((out, cur) => ((out[cur.symbol] = cur), out), {}),
       ),
 
@@ -296,8 +296,8 @@ export default opts => {
     tradeFee: payload => privCallLog('/wapi/v3/tradeFee.html', payload).then(res => res.tradeFee),
     assetDetail: payload => privCallLog('/wapi/v3/assetDetail.html', payload),
 
-    getDataStream: () => privCallLog('/v1/userDataStream', null, 'POST', true),
-    keepDataStream: payload => privCallLog('/v1/userDataStream', payload, 'PUT', false, true),
-    closeDataStream: payload => privCallLog('/v1/userDataStream', payload, 'DELETE', false, true),
+    getDataStream: () => privCallLog('/v3/userDataStream', null, 'POST', true),
+    keepDataStream: payload => privCallLog('/v3/userDataStream', payload, 'PUT', false, true),
+    closeDataStream: payload => privCallLog('/v3/userDataStream', payload, 'DELETE', false, true),
   }
 }
