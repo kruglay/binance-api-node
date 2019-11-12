@@ -73,7 +73,7 @@ const checkParams = (name, payload, requires = []) => {
  * @param {object} headers
  * @returns {object} The api response
  */
-const publicCall = ({ base, logToDb }) => (path, data, method = 'GET', headers = {}) => {
+const publicCall = ({ base, logToDb, mode }) => (path, data, method = 'GET', headers = {}) => {
   if (logToDb) {
     logToDb.collection('requests').insertOne({
       query: `${base}/api${path}${makeQueryString(data)}`,
@@ -88,6 +88,7 @@ const publicCall = ({ base, logToDb }) => (path, data, method = 'GET', headers =
       method,
       json: true,
       headers,
+      mode
     }),
   )
 }
@@ -119,7 +120,7 @@ const keyCall = ({ apiKey, pubCall }) => (path, data, method = 'GET') => {
  * @param {object} headers
  * @returns {object} The api response
  */
-const privateCall = ({ apiKey, apiSecret, base, getTime = defaultGetTime, pubCall, logToDb }) => (
+const privateCall = ({ apiKey, apiSecret, base, getTime = defaultGetTime, pubCall, logToDb, mode }) => (
   path,
   data = {},
   method = 'GET',
@@ -154,6 +155,7 @@ const privateCall = ({ apiKey, apiSecret, base, getTime = defaultGetTime, pubCal
         method,
         headers: { 'X-MBX-APIKEY': apiKey },
         json: true,
+        mode
       })
     }
 
@@ -166,6 +168,7 @@ const privateCall = ({ apiKey, apiSecret, base, getTime = defaultGetTime, pubCal
           method,
           headers: { 'X-MBX-APIKEY': apiKey },
           json: true,
+          mode
         },
       ),
     )
