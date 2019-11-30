@@ -9,8 +9,7 @@
   ],
   "scripts": {
     "build": "rimraf dist && babel src -d dist",
-    "prepare": "yarn build",
-    "install": "yarn build",
+    "prepare": "yarn build",    
     "test": "ava --timeout=10s",
     "cover": "nyc ava",
     "report": "yarn cover && nyc report --reporter=text-lcov | coveralls",
